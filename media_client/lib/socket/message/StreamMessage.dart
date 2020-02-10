@@ -6,18 +6,17 @@ import 'package:flutter/material.dart';
 
 class StreamMessage {
   MediaStreamHead head;
-  Int8List bytes;
+  Uint8List bytes;
 
-  Int8List encode() {
-    Int8List headBytes = head.encode();
-    var msg = headBytes;
+  Uint8List encode() {
+    Uint8List headBytes = head.encode();
     if (bytes != null) {
-      msg += bytes;
+      return MessageUtil.wrap(Uint8List.fromList(headBytes + bytes));
     }
-    return MessageUtil.wrap(msg);
+    return MessageUtil.wrap(headBytes);
   }
 
-  void decode(Int8List buf) {
+  void decode(Uint8List buf) {
     var data = buf.buffer.asByteData();
     var headLength = data.getInt32(0);
     var headBytes = buf.sublist(4, headLength + 4);
@@ -32,15 +31,15 @@ class MediaStreamHead {
   String mid;
   String parentId;
 
-  Int8List encode() {
-    var name = type.toString();
-    var body = MessageUtil.encodeString(name);
-    body += MessageUtil.encodeString(mid);
-    body += MessageUtil.encodeString(parentId);
-    return MessageUtil.wrap(body);
+  Uint8List encode() {
+    var name = getName(type);
+    var body = MessageUtil.encodeString(name) +
+        MessageUtil.encodeString(mid) +
+        MessageUtil.encodeString(parentId);
+    return MessageUtil.wrap(Uint8List.fromList(body));
   }
 
-  void decode(Int8List headBytes) {
+  void decode(Uint8List headBytes) {
     StringDecodeResult typeName = MessageUtil.decodeString(headBytes);
     this.type = getByName(typeName.value);
     headBytes = headBytes.sublist(typeName.offset);
@@ -53,11 +52,14 @@ class MediaStreamHead {
 
   MediaStreamType getByName(String value) {
     for (var v in MediaStreamType.values) {
-      if (v.toString() == value) {
+      if (v.toString().split('.')[1] == value) {
         return v;
       }
     }
     return null;
+  }
+  String getName(MediaStreamType type){
+    return type.toString().split('.')[1];
   }
 
   void build() {
@@ -91,6 +93,7 @@ enum MediaStreamType {
   Message,
   Ping,
   Pong
+
 }
 
 class StringDecodeResult {
@@ -99,30 +102,36 @@ class StringDecodeResult {
 }
 
 class MessageUtil {
-  static Int8List encodeString(String value) {
+  static Uint8List encodeString(String value) {
     var l = ByteData(4);
     if (value == null || value == "") {
       l.setInt32(0, 0);
-      return l.buffer.asInt8List();
+      return l.buffer.asUint8List();
     }
     List<int> encoded = utf8.encode(value);
     l.setInt32(0, encoded.length);
-    var result = l.buffer.asInt8List() + encoded;
-    return result;
+    var result = l.buffer.asUint8List() + Uint8List.fromList(encoded);
+    return Uint8List.fromList(result);
   }
 
-  static Int8List wrap(Int8List body) {
+  static Uint8List wrap(Uint8List body) {
     var l = ByteData(4);
     l.setInt32(0, body.lengthInBytes);
-    return l.buffer.asInt8List() + body;
+    return Uint8List.fromList(l.buffer.asUint8List() + body);
   }
 
-  static StringDecodeResult decodeString(Int8List buf) {
+  static StringDecodeResult decodeString(Uint8List buf) {
     var data = buf.buffer.asByteData();
     var length = data.getInt32(0);
+    StringDecodeResult result = new StringDecodeResult();
+    if(length==0){
+      result.offset=4;
+      result.value=null;
+      return result;
+    }
     var dataBytes = buf.sublist(4, length + 4);
 
-    StringDecodeResult result = new StringDecodeResult();
+
     result.offset = length + 4;
     result.value = utf8.decode(dataBytes);
     return result;

@@ -11,11 +11,11 @@ class MessageFactory {
     head.build();
     message.head=head;
     if (type == MediaStreamType.Binary) {
-      message.bytes=data as Int8List;
+      message.bytes=data as Uint8List;
     } else if (data != null) {
       String jsonValue = json.encode(data);
-      var bytes = utf8.encode(jsonValue);
-      message.bytes=bytes;
+      List<int> bytes = utf8.encode(jsonValue);
+      message.bytes=Uint8List.fromList(bytes);
     }
     return message;
   }
